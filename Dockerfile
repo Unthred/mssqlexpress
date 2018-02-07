@@ -1,33 +1,20 @@
-FROM microsoft/windowsservercore
+# mssql-server-linux
+# Maintainers: Microsoft Corporation (LuisBosquez and twright-msft on GitHub)
+# GitRepo: https://github.com/Microsoft/mssql-docker
 
-LABEL maintainer "Perry Skountrianos"
+# Base OS layer: Latest Ubuntu LTS.
+FROM ubuntu:16.04
 
-# Download Links:
-ENV exe "https://go.microsoft.com/fwlink/?linkid=840945"
-ENV box "https://go.microsoft.com/fwlink/?linkid=840944"
+# Set environment variables
+ENV ACCEPT_EULA=Y
+ENV SA_PASSWORD=Password1 
+ENV MSSQL_PID=Express
 
-ENV sa_password="_" \
-    attach_dbs="[]" \
-    ACCEPT_EULA="_" \
-    sa_password_path="C:\ProgramData\Docker\secrets\sa-password"
+# Default SQL Server TCP/Port.
+EXPOSE 1433
 
-SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+# Copy all SQL Server runtime files from build drop into image.
+COPY ./install /
 
-# make install files accessible
-COPY start.ps1 /
-WORKDIR /
-
-RUN Invoke-WebRequest -Uri $env:box -OutFile SQL.box ; \
-        Invoke-WebRequest -Uri $env:exe -OutFile SQL.exe ; \
-        Start-Process -Wait -FilePath .\SQL.exe -ArgumentList /qs, /x:setup ; \
-        .\setup\setup.exe /q /ACTION=Install /INSTANCENAME=MSSQLSERVER /FEATURES=SQLEngine /UPDATEENABLED=0 /SQLSVCACCOUNT='NT AUTHORITY\System' /SQLSYSADMINACCOUNTS='BUILTIN\ADMINISTRATORS' /TCPENABLED=1 /NPENABLED=0 /IACCEPTSQLSERVERLICENSETERMS ; \
-        Remove-Item -Recurse -Force SQL.exe, SQL.box, setup
-
-RUN stop-service MSSQLSERVER ; \
-        set-itemproperty -path 'HKLM:\software\microsoft\microsoft sql server\mssql14.MSSQLSERVER\mssqlserver\supersocketnetlib\tcp\ipall' -name tcpdynamicports -value '' ; \
-        set-itemproperty -path 'HKLM:\software\microsoft\microsoft sql server\mssql14.MSSQLSERVER\mssqlserver\supersocketnetlib\tcp\ipall' -name tcpport -value 1433 ; \
-        set-itemproperty -path 'HKLM:\software\microsoft\microsoft sql server\mssql14.MSSQLSERVER\mssqlserver\' -name LoginMode -value 2 ;
-
-HEALTHCHECK CMD [ "sqlcmd", "-Q", "select 1" ]
-
-CMD .\start -sa_password Password1 -ACCEPT_EULA Y -Verbose
+# Run SQL Server process.
+CMD /opt/mssql/bin/sqlservr
